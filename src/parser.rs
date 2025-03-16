@@ -6,6 +6,8 @@ pub struct Parser<'a> {
     str: &'a [u8],
     pos: usize,
     len: usize,
+    line: usize,
+    line_index: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -15,6 +17,8 @@ impl<'a> Parser<'a> {
             str,
             pos: 0,
             len: str.len(),
+            line: 1,
+            line_index: 1,
         }
     }
 
@@ -52,7 +56,7 @@ impl<'a> Parser<'a> {
             Some(t) => match t {
                 b'"' => return self.parse_str().map(|x| Value::Str(x.to_string())),
                 b'-' | b'.' | b'0'..=b'9' => return self.parse_any_number(),
-                b'_' | b'a'..=b'z' | b'A'..=b'Z' => return self.parse_key_val(),
+                b'_' | b'a'..=b'z' | b'A'..=b'Z' | b'[' | b']' => return self.parse_key_val(),
                 b'{' => return self.parse_array(),
                 _ => return self.error(format!("unexpected token: {}", t)),
             },
@@ -144,6 +148,12 @@ impl<'a> Parser<'a> {
     fn erase_whitespace(&mut self) {
         while let Some(c) = self.peek() {
             if c == b' ' || c == b'\t' || c == b'\n' || c == b'\r' {
+                if c == b'\n' {
+                    self.line += 1;
+                    self.line_index = 1;
+                } else {
+                    self.line_index += 1;
+                }
                 self.eat_char();
             } else {
                 break;
@@ -155,6 +165,12 @@ impl<'a> Parser<'a> {
         if self.pos < self.len {
             let c = self.str[self.pos];
             self.pos += 1;
+            if c == b'\n' {
+                self.line += 1;
+                self.line_index = 1;
+            } else {
+                self.line_index += 1;
+            }
             Some(c)
         } else {
             None
@@ -183,7 +199,7 @@ impl<'a> Parser<'a> {
         let end = loop {
             match self.peek() {
                 Some(t) => match t {
-                    b'_' | b'a'..=b'z' | b'A'..=b'Z' => self.eat_char(),
+                    b'_' | b'a'..=b'z' | b'A'..=b'Z' | b'[' | b']' => self.eat_char(),
                     b'0'..=b'9' => {
                         if is_first {
                             return self.error("unexpected digit");
@@ -224,7 +240,10 @@ impl<'a> Parser<'a> {
     where
         T: std::fmt::Display,
     {
-        anyhow::Error::msg(format!("Failed to parse at position {}: {}", self.pos, msg))
+        anyhow::Error::msg(format!(
+            "Failed to parse at position line {} column {} (byte {}): {}",
+            self.line, self.line_index, self.pos, msg
+        ))
     }
 
     fn error<T, A>(&self, msg: T) -> Result<A>
@@ -232,8 +251,8 @@ impl<'a> Parser<'a> {
         T: std::fmt::Display,
     {
         Err(anyhow::Error::msg(format!(
-            "Failed to parse at position {}: {}",
-            self.pos, msg
+            "Failed to parse at position line {} column {} (byte {}): {}",
+            self.line, self.line_index, self.pos, msg
         )))
     }
 }
