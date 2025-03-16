@@ -105,6 +105,7 @@ impl Dumper {
             self.current_line_width = 6;
             self.dump_value(&ast.ast)?;
         }
+        self.writer.write(b"\n")?;
         Ok(())
     }
 
