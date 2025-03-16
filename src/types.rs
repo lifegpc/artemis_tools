@@ -17,6 +17,13 @@ impl Value {
         }
     }
 
+    pub fn as_int(&self) -> Option<i64> {
+        match self {
+            Value::Int(i) => Some(*i),
+            _ => None,
+        }
+    }
+
     pub fn is_array(&self) -> bool {
         matches!(self, Value::Array(_))
     }
@@ -64,13 +71,18 @@ impl AstFile {
                 while let Some(o) = arr.pop() {
                     match o {
                         Value::KeyVal((k, v)) => {
-                            maps.insert(k, v);
+                            let line = v.find_keyval("line").map_or(None, |v| v.as_int());
+                            if let Some(line) = line {
+                                maps.insert(line, Value::KeyVal((k, v)));
+                            } else {
+                                others.push(Value::KeyVal((k, v)));
+                            }
                         }
                         _ => others.push(o),
                     }
                 }
                 for (k, v) in maps {
-                    arr.push(Value::KeyVal((k, v)));
+                    arr.push(v);
                 }
                 for o in others {
                     arr.push(o);
