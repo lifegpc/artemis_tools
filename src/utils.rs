@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::io;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -62,6 +63,10 @@ pub fn collect_ast_files(files: &Vec<String>, recursive: bool) -> io::Result<Vec
     } else {
         // 处理files列表中的每个文件或目录
         for file in files {
+            if file == "-" {
+                result.push("-".into());
+                continue;
+            }
             let path = PathBuf::from(&file);
 
             if path.is_file() {
@@ -78,4 +83,22 @@ pub fn collect_ast_files(files: &Vec<String>, recursive: bool) -> io::Result<Vec
     }
 
     Ok(result)
+}
+
+pub fn read_file<F: AsRef<Path> + ?Sized>(f: &F) -> io::Result<Vec<u8>> {
+    let mut content = Vec::new();
+    if f.as_ref() == Path::new("-") {
+        io::stdin().read_to_end(&mut content)?;
+    } else {
+        content = fs::read(f)?;
+    }
+    Ok(content)
+}
+
+pub fn write_file<F: AsRef<Path> + ?Sized>(f: &F) -> io::Result<Box<dyn Write>> {
+    Ok(if f.as_ref() == Path::new("-") {
+        Box::new(io::stdout())
+    } else {
+        Box::new(fs::File::create(f)?)
+    })
 }

@@ -81,7 +81,7 @@ impl AstFile {
                         _ => others.push(o),
                     }
                 }
-                for (k, v) in maps {
+                for (_, v) in maps {
                     arr.push(v);
                 }
                 for o in others {

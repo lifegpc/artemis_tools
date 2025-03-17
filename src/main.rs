@@ -7,13 +7,13 @@ mod types;
 mod utils;
 
 fn fmt_file(f: &str, args: &args::Arg, sort_blocks: bool) {
-    let content = std::fs::read(f).unwrap();
+    let content = utils::read_file(f).unwrap();
     let mut parser = parser::Parser::new(&content);
     let mut ast = parser.parse().unwrap();
     if sort_blocks {
         ast.sort_blocks();
     }
-    let f = std::fs::File::create(f).unwrap();
+    let f = utils::write_file(f).unwrap();
     let f = std::io::BufWriter::new(f);
     let mut dumper = dump::Dumper::new(f);
     if args.no_indent {
@@ -31,7 +31,7 @@ fn main() {
     let args = args::Arg::parse();
     match &args.command {
         args::Commands::TestParse { file } => {
-            let content = std::fs::read(file).unwrap();
+            let content = utils::read_file(file).unwrap();
             let mut parser = parser::Parser::new(&content);
             let ast = parser.parse().unwrap();
             println!("{:#?}", ast);
