@@ -215,6 +215,7 @@ impl AstFile {
                                                         .map_or(None, |v| v.as_str())
                                                         .map(|v| v.to_string());
                                                     let mut text = String::new();
+                                                    let mut ruby_rt = None;
                                                     match v {
                                                         Value::Array(v) => {
                                                             for v in v {
@@ -223,7 +224,7 @@ impl AstFile {
                                                                         text.push_str(s)
                                                                     }
                                                                     Value::Array(s) => {
-                                                                        let ok = if s.len() == 1 {
+                                                                        let ok = if s.len() >= 1 {
                                                                             if let Value::Str(s) =
                                                                                 &s[0]
                                                                             {
@@ -233,6 +234,18 @@ impl AstFile {
                                                                                     text.push_str(
                                                                                         "\n",
                                                                                     );
+                                                                                    true
+                                                                                } else if s == "txruby" {
+                                                                                    if let Some(rt) = &ruby_rt {
+                                                                                        text.push_str(&format!("<rt>{}</rt></ruby>", rt));
+                                                                                        ruby_rt = None;
+                                                                                    } else {
+                                                                                        let rt = v.find_keyval("text").map_or(None, |v| v.as_str()).unwrap_or("");
+                                                                                        if !rt.is_empty() {
+                                                                                            text.push_str("<ruby>");
+                                                                                            ruby_rt = Some(rt);
+                                                                                        }
+                                                                                    }
                                                                                     true
                                                                                 } else {
                                                                                     false
@@ -310,10 +323,11 @@ impl AstFile {
                         let file = select
                             .find_keyval("file")
                             .map_or(None, |v| v.as_str())
-                            .ok_or(anyhow::anyhow!(
-                                "Can not get file from select block {}",
-                                label
-                            ))?;
+                            .map(|v| v.to_string());
+                        let slabel = select
+                            .find_keyval("label")
+                            .map_or(None, |v| v.as_str())
+                            .map(|v| v.to_string());
                         if !used.contains_key(text) {
                             used.insert(text, 0);
                         }
@@ -344,7 +358,8 @@ impl AstFile {
                                             *count += 1;
                                             vec.push(Select {
                                                 text: text.to_string(),
-                                                file: file.to_string(),
+                                                file: file.clone(),
+                                                label: slabel.clone(),
                                             });
                                         }
                                         _ => {}
@@ -411,7 +426,8 @@ pub struct ExCall {
 #[derive(Debug)]
 pub struct Select {
     pub text: String,
-    pub file: String,
+    pub file: Option<String>,
+    pub label: Option<String>,
 }
 
 #[derive(Debug)]

@@ -59,7 +59,10 @@ impl MarkdownRenderer {
                 }
             }
             Message::ExCall(excall) => {
-                if let Some(file) = &excall.file {
+                if let (Some(file), Some(label)) = (&excall.file, &excall.label) {
+                    self.count += 1;
+                    writeln!(self.writer, "{}. [{}]({}.ast#{})", self.count, file, file, label)?;
+                } else if let Some(file) = &excall.file {
                     self.count += 1;
                     writeln!(self.writer, "{}. [{}]({}.ast)", self.count, file, file)?;
                 } else if let Some(label) = &excall.label {
@@ -82,7 +85,15 @@ impl MarkdownRenderer {
                     self.count += 1;
                     writeln!(self.writer, "{}. ", self.count)?;
                     for sel in select {
-                        writeln!(self.writer, "  - [{}]({}.ast)", sel.text, sel.file)?;
+                        if let (Some(file), Some(label)) = (&sel.file, &sel.label) {
+                            writeln!(self.writer, "  - [{}]({}.ast#{})", sel.text, file, label)?;
+                        } else if let Some(file) = &sel.file {
+                            writeln!(self.writer, "  - [{}]({}.ast)", sel.text, file)?;
+                        } else if let Some(label) = &sel.label {
+                            writeln!(self.writer, "  - [{}](#{})", sel.text, label)?;
+                        } else {
+                            writeln!(self.writer, "  - {}", sel.text)?;
+                        }
                     }
                 }
             }
