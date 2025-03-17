@@ -22,7 +22,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> Result<AstFile> {
+    pub fn parse(mut self) -> Result<AstFile> {
         self.erase_whitespace();
         self.parse_indent(b"astver")?;
         self.parse_equal()?;

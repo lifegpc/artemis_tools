@@ -1,4 +1,37 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+
+#[derive(ValueEnum, Clone, Debug)]
+pub enum RenderType {
+    /// Render messages in Markdown format (GitHub Flavored Markdown)
+    Markdown,
+}
+
+impl ToString for RenderType {
+    fn to_string(&self) -> String {
+        match self {
+            RenderType::Markdown => "markdown".to_string(),
+        }
+    }
+}
+
+#[derive(Subcommand, Debug)]
+pub enum MessageCmds {
+    /// Parse messages from files and print them in debug format
+    Test {
+        /// AST file to parse
+        file: String,
+    },
+    Render {
+        /// AST file want to render
+        file: String,
+        #[arg(short, long)]
+        /// Output file, by default, it print to stdout
+        output: Option<String>,
+        /// Output format
+        #[arg(short, long, default_value_t = RenderType::Markdown)]
+        r#type: RenderType,
+    },
+}
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
@@ -15,6 +48,11 @@ pub enum Commands {
         #[arg(short, long)]
         /// Sort blocks in AST file
         sort_blocks: bool,
+    },
+    /// Process messages from Artemis Engine
+    Message {
+        #[command(subcommand)]
+        cmd: MessageCmds,
     },
 }
 
@@ -34,6 +72,9 @@ pub struct Arg {
     #[arg(global = true, short = 'R', long)]
     /// Recursively search subdirectories
     pub recursive: bool,
+    #[arg(global = true, short, long)]
+    /// Print backtrace on error
+    pub backtrace: bool,
     #[command(subcommand)]
     pub command: Commands,
 }
