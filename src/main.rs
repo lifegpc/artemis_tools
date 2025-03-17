@@ -6,14 +6,14 @@ mod parser;
 mod types;
 mod utils;
 
-fn fmt_file(f: &str, args: &args::Arg, sort_blocks: bool) {
-    let content = utils::read_file(f).unwrap();
+fn fmt_file(f: &str, args: &args::Arg, sort_blocks: bool) -> anyhow::Result<()> {
+    let content = utils::read_file(f)?;
     let mut parser = parser::Parser::new(&content);
-    let mut ast = parser.parse().unwrap();
+    let mut ast = parser.parse()?;
     if sort_blocks {
         ast.sort_blocks();
     }
-    let f = utils::write_file(f).unwrap();
+    let f = utils::write_file(f)?;
     let f = std::io::BufWriter::new(f);
     let mut dumper = dump::Dumper::new(f);
     if args.no_indent {
@@ -24,7 +24,8 @@ fn fmt_file(f: &str, args: &args::Arg, sort_blocks: bool) {
     if let Some(max_line_width) = args.max_line_width {
         dumper.set_max_line_width(max_line_width);
     }
-    dumper.dump(&ast).unwrap();
+    dumper.dump(&ast)?;
+    Ok(())
 }
 
 fn main() {
@@ -38,10 +39,18 @@ fn main() {
         }
         args::Commands::Fmt { files, sort_blocks } => {
             let files = utils::collect_ast_files(files, args.recursive).unwrap();
+            let mut error = 0;
             for f in files.iter() {
-                fmt_file(f, &args, *sort_blocks);
+                if let Err(e) = fmt_file(f, &args, *sort_blocks) {
+                    eprintln!("Error formatting file {}: {}", f, e);
+                    error += 1;
+                }
             }
-            println!("Formatted {} files", files.len());
+            eprintln!("Formatted {} files", files.len() - error);
+            if error != 0 {
+                eprintln!("Failed to format {} files", error);
+                std::process::exit(1);
+            }
         }
     }
 }
