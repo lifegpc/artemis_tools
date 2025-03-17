@@ -46,20 +46,26 @@ impl MarkdownRenderer {
                 if let Some(d) = d {
                     self.count += 1;
                     let text = d.text.trim_end().replace("\n", "  \n");
-                    if let Some(name) = &d.name {
-                        writeln!(self.writer, "{}. {}: {}", self.count, name, text)?;
+                    if let Some(label) = &d.label {
+                        write!(self.writer, "{}. <a name=\"{}\"></a> ", self.count, label)?;
                     } else {
-                        writeln!(self.writer, "{}. {}", self.count, text)?;
+                        write!(self.writer, "{}. ", self.count)?;
+                    }
+                    if let Some(name) = &d.name {
+                        writeln!(self.writer, "{}: {}", name, text)?;
+                    } else {
+                        writeln!(self.writer, "{}", text)?;
                     }
                 }
             }
             Message::ExCall(excall) => {
-                self.count += 1;
-                writeln!(
-                    self.writer,
-                    "{}. [{}]({}.ast)",
-                    self.count, excall.file, excall.file
-                )?;
+                if let Some(file) = &excall.file {
+                    self.count += 1;
+                    writeln!(self.writer, "{}. [{}]({}.ast)", self.count, file, file)?;
+                } else if let Some(label) = &excall.label {
+                    self.count += 1;
+                    writeln!(self.writer, "{}. [{}](#{})", self.count, label, label)?;
+                }
             }
             Message::Select(select) => {
                 let select = if let Some(lang) = &self.language {

@@ -137,6 +137,24 @@ impl AstFile {
         let label = blocks
             .get("label")
             .ok_or(anyhow::anyhow!("label block not found"))?;
+        let mut labels = HashMap::new();
+        match label.as_ref() {
+            Value::Array(arr) => {
+                for v in arr {
+                    match v {
+                        Value::KeyVal((k, v)) => {
+                            let block = v
+                                .find_keyval("block")
+                                .map_or(None, |v| v.as_str())
+                                .ok_or(anyhow::anyhow!("Can not get block from label block"))?;
+                            labels.insert(block.to_string(), k.clone());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
         let mut label = label
             .find_keyval("top")
             .map_or(None, |v| v.find_keyval("block"))
@@ -158,10 +176,14 @@ impl AstFile {
                 let file = v
                     .find_keyval("file")
                     .map_or(None, |v| v.as_str())
-                    .ok_or(anyhow::anyhow!("Can not get file from excall"))?;
-                result.messages.push(Message::ExCall(ExCall {
-                    file: file.to_string(),
-                }));
+                    .map(|v| v.to_string());
+                let label = v
+                    .find_keyval("label")
+                    .map_or(None, |v| v.as_str())
+                    .map(|v| v.to_string());
+                result
+                    .messages
+                    .push(Message::ExCall(ExCall { file, label }));
             } else {
                 let selects = block.find_array_attrs("select");
                 if selects.is_empty() {
@@ -246,7 +268,12 @@ impl AstFile {
                                                         }
                                                         _ => {}
                                                     }
-                                                    vec.push(Dialogue { text, name });
+                                                    let la = labels.get(label).map(|v| v.clone());
+                                                    vec.push(Dialogue {
+                                                        text,
+                                                        name,
+                                                        label: la,
+                                                    });
                                                 }
                                             }
                                             _ => {}
@@ -372,11 +399,13 @@ impl AstFile {
 pub struct Dialogue {
     pub text: String,
     pub name: Option<String>,
+    pub label: Option<String>,
 }
 
 #[derive(Debug)]
 pub struct ExCall {
-    pub file: String,
+    pub file: Option<String>,
+    pub label: Option<String>,
 }
 
 #[derive(Debug)]
