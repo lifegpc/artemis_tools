@@ -198,10 +198,16 @@ impl AstFile {
             } else {
                 let selects = block.find_array_attrs("select");
                 if selects.is_empty() {
-                    let text = block.find_keyval("text").ok_or(anyhow::anyhow!(
-                        "Can not get text from dialogue block {}",
-                        label
-                    ))?;
+                    let text = match block.find_keyval("text") {
+                        Some(v) => v,
+                        None => {
+                            label = match block.find_keyval("linknext").map_or(None, |v| v.as_str()) {
+                                Some(v) => v,
+                                None => break,
+                            };
+                            continue;
+                        }
+                    };
                     match text {
                         Value::Array(v) => {
                             let mut tmp = BTreeMap::new();
