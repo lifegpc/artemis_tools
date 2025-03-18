@@ -137,7 +137,7 @@ impl AstFile {
         let label = blocks
             .get("label")
             .ok_or(anyhow::anyhow!("label block not found"))?;
-        let mut labels = HashMap::new();
+        let mut labels = HashMap::<String, Vec<String>>::new();
         match label.as_ref() {
             Value::Array(arr) => {
                 for v in arr {
@@ -147,7 +147,11 @@ impl AstFile {
                                 .find_keyval("block")
                                 .map_or(None, |v| v.as_str())
                                 .ok_or(anyhow::anyhow!("Can not get block from label block"))?;
-                            labels.insert(block.to_string(), k.clone());
+                            if labels.contains_key(block) {
+                                labels.get_mut(block).map(|v| v.push(k.clone()));
+                            } else {
+                                labels.insert(block.to_string(), vec![k.clone()]);
+                            }
                         }
                         _ => {}
                     }
@@ -172,18 +176,25 @@ impl AstFile {
                     }
                 }
             }
-            if let Some(v) = block.find_array_attrs("excall").first() {
-                let file = v
-                    .find_keyval("file")
-                    .map_or(None, |v| v.as_str())
-                    .map(|v| v.to_string());
-                let label = v
-                    .find_keyval("label")
-                    .map_or(None, |v| v.as_str())
-                    .map(|v| v.to_string());
-                result
-                    .messages
-                    .push(Message::ExCall(ExCall { file, label }));
+            let la = labels.get(label).map(|v| v.clone());
+            let excalls = block.find_array_attrs("excall");
+            if !excalls.is_empty() {
+                let mut tmp = Vec::new();
+                for v in excalls {
+                    let file = v
+                        .find_keyval("file")
+                        .map_or(None, |v| v.as_str())
+                        .map(|v| v.to_string());
+                    let label = v
+                        .find_keyval("label")
+                        .map_or(None, |v| v.as_str())
+                        .map(|v| v.to_string());
+                    tmp.push(ExCall { file, label });
+                }
+                result.messages.push(Message::ExCall(ExCalls {
+                    labels: la,
+                    excalls: tmp,
+                }));
             } else {
                 let selects = block.find_array_attrs("select");
                 if selects.is_empty() {
@@ -235,10 +246,16 @@ impl AstFile {
                                                                                         "\n",
                                                                                     );
                                                                                     true
-                                                                                } else if s == "txruby" {
-                                                                                    if let Some(rt) = &ruby_rt {
+                                                                                } else if s
+                                                                                    == "txruby"
+                                                                                {
+                                                                                    if let Some(
+                                                                                        rt,
+                                                                                    ) = &ruby_rt
+                                                                                    {
                                                                                         text.push_str(&format!("<rt>{}</rt></ruby>", rt));
-                                                                                        ruby_rt = None;
+                                                                                        ruby_rt =
+                                                                                            None;
                                                                                     } else {
                                                                                         let rt = v.find_keyval("text").map_or(None, |v| v.as_str()).unwrap_or("");
                                                                                         if !rt.is_empty() {
@@ -281,12 +298,7 @@ impl AstFile {
                                                         }
                                                         _ => {}
                                                     }
-                                                    let la = labels.get(label).map(|v| v.clone());
-                                                    vec.push(Dialogue {
-                                                        text,
-                                                        name,
-                                                        label: la,
-                                                    });
+                                                    vec.push(Dialogue { text, name });
                                                 }
                                             }
                                             _ => {}
@@ -295,19 +307,10 @@ impl AstFile {
                                     _ => {}
                                 }
                             }
-                            loop {
-                                let is_empty = tmp.iter().all(|(_, v)| v.is_empty());
-                                if is_empty {
-                                    break;
-                                }
-                                let mut tmp2 = BTreeMap::new();
-                                for (k, v) in tmp.iter_mut() {
-                                    if let Some(v) = v.pop() {
-                                        tmp2.insert(k.clone(), v);
-                                    }
-                                }
-                                result.messages.push(Message::Dialogue(tmp2));
-                            }
+                            result.messages.push(Message::Dialogue(Dialogues {
+                                labels: la,
+                                dialogues: tmp,
+                            }));
                         }
                         _ => {}
                     }
@@ -369,7 +372,10 @@ impl AstFile {
                             _ => {}
                         }
                     }
-                    result.messages.push(Message::Select(tmp));
+                    result.messages.push(Message::Select(Selects {
+                        labels: la,
+                        sels: tmp,
+                    }));
                 }
             }
             label = match block.find_keyval("linknext").map_or(None, |v| v.as_str()) {
@@ -414,13 +420,24 @@ impl AstFile {
 pub struct Dialogue {
     pub text: String,
     pub name: Option<String>,
-    pub label: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct Dialogues {
+    pub labels: Option<Vec<String>>,
+    pub dialogues: BTreeMap<String, Vec<Dialogue>>,
 }
 
 #[derive(Debug)]
 pub struct ExCall {
     pub file: Option<String>,
     pub label: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct ExCalls {
+    pub labels: Option<Vec<String>>,
+    pub excalls: Vec<ExCall>,
 }
 
 #[derive(Debug)]
@@ -431,10 +448,16 @@ pub struct Select {
 }
 
 #[derive(Debug)]
+pub struct Selects {
+    pub labels: Option<Vec<String>>,
+    pub sels: BTreeMap<String, Vec<Select>>,
+}
+
+#[derive(Debug)]
 pub enum Message {
-    Dialogue(BTreeMap<String, Dialogue>),
-    ExCall(ExCall),
-    Select(BTreeMap<String, Vec<Select>>),
+    Dialogue(Dialogues),
+    ExCall(ExCalls),
+    Select(Selects),
 }
 
 #[derive(Debug, Default)]

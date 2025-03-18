@@ -33,57 +33,93 @@ impl MarkdownRenderer {
     fn render_message(&mut self, message: &Message) -> std::io::Result<()> {
         match message {
             Message::Dialogue(dialogue) => {
+                self.count += 1;
+                write!(self.writer, "{}. ", self.count)?;
+                if let Some(labels) = &dialogue.labels {
+                    for label in labels.iter() {
+                        write!(self.writer, "<a name=\"{}\"></a>", label)?;
+                    }
+                }
                 let d = if let Some(lang) = &self.language {
-                    dialogue
-                        .get(lang)
-                        .or_else(|| dialogue.first_key_value().map(|(_, v)| v))
+                    dialogue.dialogues.get(lang)
                 } else {
-                    dialogue.first_key_value().map(|(k, v)| {
+                    dialogue.dialogues.first_key_value().map(|(k, v)| {
                         self.language = Some(k.to_string());
                         v
                     })
                 };
-                if let Some(d) = d {
-                    self.count += 1;
-                    let text = d.text.trim_end().replace("\n", "  \n");
-                    if let Some(label) = &d.label {
-                        write!(self.writer, "{}. <a name=\"{}\"></a> ", self.count, label)?;
+                if let Some(ds) = d {
+                    if ds.len() == 1 {
+                        let d = &ds[0];
+                        let text = d.text.trim_end().replace("\n", "  \n");
+                        if let Some(name) = &d.name {
+                            writeln!(self.writer, "{}: {}", name, text)?;
+                        } else {
+                            writeln!(self.writer, "{}", text)?;
+                        }
                     } else {
-                        write!(self.writer, "{}. ", self.count)?;
+                        writeln!(self.writer, "")?;
+                        for d in ds {
+                            let text = d.text.trim_end().replace("\n", "  \n");
+                            if let Some(name) = &d.name {
+                                writeln!(self.writer, "  - {}: {}", name, text)?;
+                            } else {
+                                writeln!(self.writer, "  - {}", text)?;
+                            }
+                        }
                     }
-                    if let Some(name) = &d.name {
-                        writeln!(self.writer, "{}: {}", name, text)?;
-                    } else {
-                        writeln!(self.writer, "{}", text)?;
-                    }
+                } else {
+                    writeln!(self.writer, "")?;
                 }
             }
             Message::ExCall(excall) => {
-                if let (Some(file), Some(label)) = (&excall.file, &excall.label) {
-                    self.count += 1;
-                    writeln!(self.writer, "{}. [{}]({}.ast#{})", self.count, file, file, label)?;
-                } else if let Some(file) = &excall.file {
-                    self.count += 1;
-                    writeln!(self.writer, "{}. [{}]({}.ast)", self.count, file, file)?;
-                } else if let Some(label) = &excall.label {
-                    self.count += 1;
-                    writeln!(self.writer, "{}. [{}](#{})", self.count, label, label)?;
+                self.count += 1;
+                write!(self.writer, "{}. ", self.count)?;
+                if let Some(labels) = &excall.labels {
+                    for label in labels.iter() {
+                        write!(self.writer, "<a name=\"{}\"></a>", label)?;
+                    }
+                }
+                if excall.excalls.len() == 1 {
+                    let excall = &excall.excalls[0];
+                    if let (Some(file), Some(label)) = (&excall.file, &excall.label) {
+                        writeln!(self.writer, "[{}]({}.ast#{})", file, file, label)?;
+                    } else if let Some(file) = &excall.file {
+                        writeln!(self.writer, "[{}]({}.ast)", file, file)?;
+                    } else if let Some(label) = &excall.label {
+                        writeln!(self.writer, "[{}](#{})", label, label)?;
+                    }
+                } else {
+                    writeln!(self.writer, "")?;
+                    for excall in &excall.excalls {
+                        if let (Some(file), Some(label)) = (&excall.file, &excall.label) {
+                            writeln!(self.writer, "  - [{}]({}.ast#{})", file, file, label)?;
+                        } else if let Some(file) = &excall.file {
+                            writeln!(self.writer, "  - [{}]({}.ast)", file, file)?;
+                        } else if let Some(label) = &excall.label {
+                            writeln!(self.writer, "  - [{}](#{})", label, label)?;
+                        }
+                    }
                 }
             }
             Message::Select(select) => {
+                self.count += 1;
+                write!(self.writer, "{}. ", self.count)?;
+                if let Some(labels) = &select.labels {
+                    for label in labels.iter() {
+                        write!(self.writer, "<a name=\"{}\"></a>", label)?;
+                    }
+                }
                 let select = if let Some(lang) = &self.language {
-                    select
-                        .get(lang)
-                        .or_else(|| select.first_key_value().map(|(_, v)| v))
+                    select.sels.get(lang)
                 } else {
-                    select.first_key_value().map(|(k, v)| {
+                    select.sels.first_key_value().map(|(k, v)| {
                         self.language = Some(k.to_string());
                         v
                     })
                 };
                 if let Some(select) = select {
-                    self.count += 1;
-                    writeln!(self.writer, "{}. ", self.count)?;
+                    writeln!(self.writer, "")?;
                     for sel in select {
                         if let (Some(file), Some(label)) = (&sel.file, &sel.label) {
                             writeln!(self.writer, "  - [{}]({}.ast#{})", sel.text, file, label)?;
