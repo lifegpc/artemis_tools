@@ -92,15 +92,19 @@ impl Dumper {
         if self.indent.is_none() {
             self.writer.write(b"astver=")?;
             self.dump_f64(&ast.astver)?;
-            self.writer.write(b"\nastname=\"")?;
-            self.writer.write(ast.astname.as_bytes())?;
+            if let Some(astname) = &ast.astname {
+                self.writer.write(b"\nastname = \"")?;
+                self.writer.write(astname.as_bytes())?;
+            };
             self.writer.write(b"\"\nast=")?;
             self.dump_value(&ast.ast)?;
         } else {
             self.writer.write(b"astver = ")?;
             self.dump_f64(&ast.astver)?;
-            self.writer.write(b"\nastname = \"")?;
-            self.writer.write(ast.astname.as_bytes())?;
+            if let Some(astname) = &ast.astname {
+                self.writer.write(b"\nastname = \"")?;
+                self.writer.write(astname.as_bytes())?;
+            };
             self.writer.write(b"\"\nast = ")?;
             self.current_line_width = 6;
             self.dump_value(&ast.ast)?;

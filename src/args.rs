@@ -31,6 +31,20 @@ pub enum MessageCmds {
         #[arg(short, long, default_value_t = RenderType::Markdown)]
         r#type: RenderType,
     },
+    /// Convert it to GalTransl JSON format
+    ToJson {
+        /// AST file to parse or directory to search for .ast files
+        /// If empty, use current working directory
+        file: Vec<String>,
+        #[arg(short, long)]
+        /// Output file if file is a single file otherwise it will be
+        /// output directory
+        output: String,
+        #[arg(short, long)]
+        /// Specify the language of the messages
+        /// If not specified, it will use the first language found
+        lang: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]

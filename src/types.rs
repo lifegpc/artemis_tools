@@ -96,7 +96,7 @@ impl Value {
 #[derive(Debug)]
 pub struct AstFile {
     pub astver: f64,
-    pub astname: String,
+    pub astname: Option<String>,
     pub ast: Value,
 }
 
@@ -201,7 +201,8 @@ impl AstFile {
                     let text = match block.find_keyval("text") {
                         Some(v) => v,
                         None => {
-                            label = match block.find_keyval("linknext").map_or(None, |v| v.as_str()) {
+                            label = match block.find_keyval("linknext").map_or(None, |v| v.as_str())
+                            {
                                 Some(v) => v,
                                 None => break,
                             };
@@ -233,6 +234,7 @@ impl AstFile {
                                                         .map(|v| v.to_string());
                                                     let mut text = String::new();
                                                     let mut ruby_rt = None;
+                                                    let mut in_exfont = false;
                                                     match v {
                                                         Value::Array(v) => {
                                                             for v in v {
@@ -269,6 +271,55 @@ impl AstFile {
                                                                                             ruby_rt = Some(rt);
                                                                                         }
                                                                                     }
+                                                                                    true
+                                                                                } else if s == "ruby" {
+                                                                                    let rt = v.find_keyval("text").map_or(None, |v| v.as_str()).unwrap_or("");
+                                                                                    if !rt.is_empty() {
+                                                                                        text.push_str("<ruby>");
+                                                                                        ruby_rt = Some(rt);
+                                                                                    }
+                                                                                    true
+                                                                                } else if s == "/ruby" {
+                                                                                    if let Some(rt) = &ruby_rt {
+                                                                                        text.push_str(&format!("<rt>{}</rt></ruby>", rt));
+                                                                                        ruby_rt = None;
+                                                                                    } else {
+                                                                                        text.push_str("</ruby>");
+                                                                                    }
+                                                                                    true
+                                                                                } else if s == "exfont" {
+                                                                                    text.push('<');
+                                                                                    in_exfont = !in_exfont;
+                                                                                    if !in_exfont {
+                                                                                        text.push('/');
+                                                                                    }
+                                                                                    text.push_str(s);
+                                                                                    match v {
+                                                                                        Value::Array(arr) => {
+                                                                                            for v in arr {
+                                                                                                match v {
+                                                                                                    Value::KeyVal((k, v)) => {
+                                                                                                        let v = match v.as_ref() {
+                                                                                                            Value::Str(s) => s.clone(),
+                                                                                                            Value::Float(s) => {
+                                                                                                                let s = format!("{}", s);
+                                                                                                                s
+                                                                                                            }
+                                                                                                            Value::Int(s) => {
+                                                                                                                let s = format!("{}", s);
+                                                                                                                s
+                                                                                                            }
+                                                                                                            _ => String::new(),
+                                                                                                        };
+                                                                                                        text.push_str(&format!(" {}=\"{}\"", k, v));
+                                                                                                    }
+                                                                                                    _ => {}
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                        _ => {}
+                                                                                    }
+                                                                                    text.push('>');
                                                                                     true
                                                                                 } else {
                                                                                     false

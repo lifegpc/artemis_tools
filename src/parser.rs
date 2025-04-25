@@ -28,16 +28,19 @@ impl<'a> Parser<'a> {
         self.parse_equal()?;
         let astver = self.parse_f64()?;
         self.erase_whitespace();
-        self.parse_indent(b"astname")?;
-        self.parse_equal()?;
-        let astname = self.parse_str()?;
-        self.erase_whitespace();
+        let mut astname = None;
+        if self.is_indent(b"astname") {
+            self.parse_indent(b"astname")?;
+            self.parse_equal()?;
+            astname = Some(self.parse_str()?.to_string());
+            self.erase_whitespace();
+        }
         self.parse_indent(b"ast")?;
         self.parse_equal()?;
         let ast = self.parse_value()?;
         Ok(AstFile {
             astver,
-            astname: astname.to_string(),
+            astname,
             ast,
         })
     }
@@ -214,6 +217,18 @@ impl<'a> Parser<'a> {
             is_first = false;
         };
         std::str::from_utf8(&self.str[start..end]).map_err(|e| self.error2(e))
+    }
+
+    fn is_indent(&self, indent: &[u8]) -> bool {
+        if self.pos + indent.len() > self.len {
+            return false;
+        }
+        for (i, c) in indent.iter().enumerate() {
+            if self.str[self.pos + i] != *c {
+                return false;
+            }
+        }
+        true
     }
 
     fn parse_indent(&mut self, indent: &[u8]) -> Result<()> {

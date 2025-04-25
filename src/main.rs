@@ -1,7 +1,9 @@
 use clap::Parser;
+use std::io::Write;
 
 mod args;
 mod dump;
+mod galtransl;
 mod parser;
 mod render;
 mod types;
@@ -27,6 +29,20 @@ fn fmt_file(f: &str, args: &args::Arg, sort_blocks: bool) -> anyhow::Result<()> 
     }
     dumper.dump(&ast)?;
     Ok(())
+}
+
+fn to_json(f: &str, output: &str, lang: Option<String>) -> anyhow::Result<bool> {
+    let content = utils::read_file(f)?;
+    let parser = parser::Parser::new(&content);
+    let ast = parser.parse()?;
+    let output_json = ast.to_galtransl_json(lang)?;
+    if output_json.is_empty() {
+        return Ok(false);
+    }
+    let f = utils::write_file(output)?;
+    let mut f = std::io::BufWriter::new(f);
+    f.write(output_json.as_bytes())?;
+    Ok(true)
 }
 
 fn main() {
@@ -81,6 +97,60 @@ fn main() {
                     renderer.render(&ast.get_messages().unwrap()).unwrap();
                 }
             },
+            args::MessageCmds::ToJson { file, output, lang } => {
+                let files = utils::collect_ast_files(file, args.recursive).unwrap();
+                if files.len() == 1 {
+                    let content = utils::read_file(&files[0]).unwrap();
+                    let parser = parser::Parser::new(&content);
+                    let ast = parser.parse().unwrap();
+                    let output_json = ast.to_galtransl_json(lang.clone()).unwrap();
+                    if output_json.is_empty() {
+                        eprintln!("Skipped empty file {}", files[0]);
+                        std::process::exit(0);
+                    }
+                    let f = utils::write_file(output).unwrap();
+                    let mut f = std::io::BufWriter::new(f);
+                    f.write(output_json.as_bytes()).unwrap();
+                } else {
+                    let mut error = 0;
+                    let mut skiped = 0;
+                    for f in files.iter() {
+                        let basename = match std::path::Path::new(f).file_name() {
+                            Some(b) => b.to_string_lossy().to_string(),
+                            None => {
+                                eprintln!("Error: {} is not a valid file", f);
+                                error += 1;
+                                continue;
+                            }
+                        };
+                        let mut output_file = std::path::PathBuf::from(output).join(basename);
+                        output_file.set_extension("json");
+                        let output_file = output_file.to_string_lossy().to_string();
+                        match to_json(f, &output_file, lang.clone()) {
+                            Ok(s) => {
+                                if !s {
+                                    skiped += 1;
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Error converting file {}: {}", f, e);
+                                if args.backtrace {
+                                    eprintln!("{}", e.backtrace());
+                                }
+                                error += 1;
+                            }
+                        }
+                    }
+                    eprintln!("Converted {} files", files.len() - error - skiped);
+                    if skiped != 0 {
+                        eprintln!("Skipped {} empty files", skiped);
+                    }
+                    if error != 0 {
+                        eprintln!("Failed to convert {} files", error);
+                        std::process::exit(1);
+                    }
+                }
+            }
         },
     }
 }
