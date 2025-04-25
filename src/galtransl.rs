@@ -15,10 +15,22 @@ impl AstFile {
         let mut lang: Option<String> = lang.clone();
         match &mes.savetitle {
             Some(title) => {
-                messages.push(GalTranslMessage {
-                    message: title.clone(),
-                    name: None,
-                });
+                let title = if let Some(lang) = &lang {
+                    title.get(lang).or_else(|| title.get("text"))
+                } else {
+                    title.first_key_value().map(|(k, v)| {
+                        if k != "text" {
+                            lang = Some(k.to_string());
+                        }
+                        v
+                    })
+                };
+                if let Some(title) = title {
+                    messages.push(GalTranslMessage {
+                        message: title.clone(),
+                        name: None,
+                    });
+                }
             }
             None => {}
         };

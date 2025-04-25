@@ -18,7 +18,19 @@ impl MarkdownRenderer {
 
     pub fn render(mut self, messages: &Messages) -> anyhow::Result<()> {
         if let Some(title) = &messages.savetitle {
-            self.render_title(title)?;
+            let title = if let Some(lang) = &self.language {
+                title.get(lang).or_else(|| title.get("text"))
+            } else {
+                title.first_key_value().map(|(k, v)| {
+                    if k != "text" {
+                        self.language = Some(k.to_string());
+                    }
+                    v
+                })
+            };
+            if let Some(title) = title {
+                self.render_title(title)?;
+            }
         }
         for message in &messages.messages {
             self.render_message(message)?;

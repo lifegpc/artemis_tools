@@ -171,8 +171,24 @@ impl AstFile {
             };
             if result.savetitle.is_none() {
                 if let Some(v) = block.find_array_attrs("savetitle").first() {
-                    if let Some(v) = v.find_keyval("text").map_or(None, |v| v.as_str()) {
-                        result.savetitle = Some(v.to_string());
+                    let mut title = BTreeMap::new();
+                    match v {
+                        Value::Array(arr) => {
+                            for v in arr {
+                                match v {
+                                    Value::KeyVal((k, v)) => {
+                                        if let Some(v) = v.as_str() {
+                                            title.insert(k.to_string(), v.to_string());
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                    if !title.is_empty() {
+                        result.savetitle = Some(title);
                     }
                 }
             }
@@ -272,28 +288,48 @@ impl AstFile {
                                                                                         }
                                                                                     }
                                                                                     true
-                                                                                } else if s == "ruby" {
+                                                                                } else if s
+                                                                                    == "ruby"
+                                                                                {
                                                                                     let rt = v.find_keyval("text").map_or(None, |v| v.as_str()).unwrap_or("");
-                                                                                    if !rt.is_empty() {
+                                                                                    if !rt
+                                                                                        .is_empty()
+                                                                                    {
                                                                                         text.push_str("<ruby>");
-                                                                                        ruby_rt = Some(rt);
+                                                                                        ruby_rt =
+                                                                                            Some(
+                                                                                                rt,
+                                                                                            );
                                                                                     }
                                                                                     true
-                                                                                } else if s == "/ruby" {
-                                                                                    if let Some(rt) = &ruby_rt {
+                                                                                } else if s
+                                                                                    == "/ruby"
+                                                                                {
+                                                                                    if let Some(
+                                                                                        rt,
+                                                                                    ) = &ruby_rt
+                                                                                    {
                                                                                         text.push_str(&format!("<rt>{}</rt></ruby>", rt));
-                                                                                        ruby_rt = None;
+                                                                                        ruby_rt =
+                                                                                            None;
                                                                                     } else {
                                                                                         text.push_str("</ruby>");
                                                                                     }
                                                                                     true
-                                                                                } else if s == "exfont" {
+                                                                                } else if s
+                                                                                    == "exfont"
+                                                                                {
                                                                                     text.push('<');
-                                                                                    in_exfont = !in_exfont;
+                                                                                    in_exfont =
+                                                                                        !in_exfont;
                                                                                     if !in_exfont {
-                                                                                        text.push('/');
+                                                                                        text.push(
+                                                                                            '/',
+                                                                                        );
                                                                                     }
-                                                                                    text.push_str(s);
+                                                                                    text.push_str(
+                                                                                        s,
+                                                                                    );
                                                                                     match v {
                                                                                         Value::Array(arr) => {
                                                                                             for v in arr {
@@ -389,9 +425,9 @@ impl AstFile {
                             .map_or(None, |v| v.as_str())
                             .map(|v| v.to_string());
                         if !used.contains_key(text) {
-                            used.insert(text, 0);
+                            used.insert(text, BTreeMap::new());
                         }
-                        let count = used.get_mut(text).unwrap();
+                        let count_map = used.get_mut(text).unwrap();
                         let text_block = block.find_keyval(text).ok_or(anyhow::anyhow!(
                             "Can not get text block {} from select block {}",
                             text,
@@ -407,6 +443,12 @@ impl AstFile {
                                             } else {
                                                 tmp.insert(k.to_string(), Vec::new());
                                                 tmp.get_mut(k).unwrap()
+                                            };
+                                            let count = if count_map.contains_key(k) {
+                                                count_map.get_mut(k).unwrap()
+                                            } else {
+                                                count_map.insert(k.clone(), 0);
+                                                count_map.get_mut(k).unwrap()
                                             };
                                             let text = v
                                                 .get_member(*count)
@@ -519,6 +561,6 @@ pub enum Message {
 
 #[derive(Debug, Default)]
 pub struct Messages {
-    pub savetitle: Option<String>,
+    pub savetitle: Option<BTreeMap<String, String>>,
     pub messages: Vec<Message>,
 }
